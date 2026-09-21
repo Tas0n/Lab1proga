@@ -81,8 +81,8 @@ public async Task<IReadOnlyList<IncidentSeveritySummaryResponse>> GetSeveritySum
 
         var summaryWithZeros = allSeverities
             .Select(sev => new IncidentSeveritySummaryResponse(
-                Severity: sev,
-                Count: dbGrouped.FirstOrDefault(x => string.Equals(x.Severity, sev, StringComparison.OrdinalIgnoreCase))?.Count ?? 0
+                severity: sev,
+                count: dbGrouped.FirstOrDefault(x => string.Equals(x.Severity, sev, StringComparison.OrdinalIgnoreCase))?.Count ?? 0
             ));
 
         // 6. Порядок сортування за критичністю
