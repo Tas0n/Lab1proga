@@ -65,7 +65,7 @@ public async Task<IReadOnlyList<IncidentSeveritySummaryResponse>> GetSeveritySum
     {
         logger.LogInformation("Loading incident severity summary");
 
-        // 1–4. Агрегація з PostgreSQL через EF Core
+        
         var dbGrouped = await dbContext.Incidents
             .AsNoTracking()
             .GroupBy(x => x.Severity)
@@ -76,7 +76,7 @@ public async Task<IReadOnlyList<IncidentSeveritySummaryResponse>> GetSeveritySum
             })
             .ToListAsync(cancellationToken);
 
-        // 5. Політика нульових груп: заповнюємо всі значення Enum IncidentSeverity
+        
         var allSeverities = Enum.GetNames<IncidentSeverity>();
 
        var summaryWithZeros = allSeverities
@@ -85,7 +85,7 @@ public async Task<IReadOnlyList<IncidentSeveritySummaryResponse>> GetSeveritySum
         dbGrouped.FirstOrDefault(x => string.Equals(x.Severity, sev, StringComparison.OrdinalIgnoreCase))?.Count ?? 0
     ));
 
-        // 6. Порядок сортування за критичністю
+        
         var priorityOrder = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
             { "Critical", 1 },
