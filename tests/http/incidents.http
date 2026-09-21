@@ -28,3 +28,11 @@ Accept: application/json
 ### Lab 1 extension point: expected 501 before student implementation
 GET {{host}}/api/incidents/severity-summary
 Accept: application/json
+# Expected Response: 200 OK
+# Body:
+# [
+#   { "severity": "Critical", "count": 0 },
+#   { "severity": "High", "count": 1 },
+#   { "severity": "Medium", "count": 1 },
+#   { "severity": "Low", "count": 1 }
+# ]
