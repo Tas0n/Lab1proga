@@ -134,7 +134,7 @@ async function loadSeveritySummary() {
       const li = document.createElement("li");
       li.style.padding = "0.5rem 0";
       
-      // Використання createTextElement (всередині textContent) гарантує захист від XSS
+      
       li.append(
         createTextElement("strong", `${item.severity}: `),
         document.createTextNode(item.count)
