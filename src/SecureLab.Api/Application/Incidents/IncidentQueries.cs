@@ -79,11 +79,11 @@ public async Task<IReadOnlyList<IncidentSeveritySummaryResponse>> GetSeveritySum
         // 5. Політика нульових груп: заповнюємо всі значення Enum IncidentSeverity
         var allSeverities = Enum.GetNames<IncidentSeverity>();
 
-        var summaryWithZeros = allSeverities
-            .Select(sev => new IncidentSeveritySummaryResponse(
-                severity: sev,
-                count: dbGrouped.FirstOrDefault(x => string.Equals(x.Severity, sev, StringComparison.OrdinalIgnoreCase))?.Count ?? 0
-            ));
+       var summaryWithZeros = allSeverities
+    .Select(sev => new IncidentSeveritySummaryResponse(
+        sev,
+        dbGrouped.FirstOrDefault(x => string.Equals(x.Severity, sev, StringComparison.OrdinalIgnoreCase))?.Count ?? 0
+    ));
 
         // 6. Порядок сортування за критичністю
         var priorityOrder = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
