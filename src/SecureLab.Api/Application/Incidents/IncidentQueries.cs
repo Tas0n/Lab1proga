@@ -59,3 +59,43 @@ public sealed class IncidentQueries(SecureLabDbContext dbContext, ILogger<Incide
             .SingleOrDefaultAsync(cancellationToken);
     }
 }
+
+public async Task<IReadOnlyList<IncidentSeveritySummaryResponse>> GetSeveritySummaryAsync(
+        CancellationToken cancellationToken = default)
+    {
+        logger.LogInformation("Loading incident severity summary");
+
+        // 1–4. Агрегація з PostgreSQL через EF Core
+        var dbGrouped = await dbContext.Incidents
+            .AsNoTracking()
+            .GroupBy(x => x.Severity)
+            .Select(g => new
+            {
+                Severity = g.Key.ToString(),
+                Count = g.Count()
+            })
+            .ToListAsync(cancellationToken);
+
+        // 5. Політика нульових груп: заповнюємо всі значення Enum IncidentSeverity
+        var allSeverities = Enum.GetNames<IncidentSeverity>();
+
+        var summaryWithZeros = allSeverities
+            .Select(sev => new IncidentSeveritySummaryResponse(
+                Severity: sev,
+                Count: dbGrouped.FirstOrDefault(x => string.Equals(x.Severity, sev, StringComparison.OrdinalIgnoreCase))?.Count ?? 0
+            ));
+
+        // 6. Порядок сортування за критичністю
+        var priorityOrder = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "Critical", 1 },
+            { "High", 2 },
+            { "Medium", 3 },
+            { "Low", 4 }
+        };
+
+        return summaryWithZeros
+            .OrderBy(x => priorityOrder.GetValueOrDefault(x.Severity, 99))
+            .ToList();
+    }
+}
