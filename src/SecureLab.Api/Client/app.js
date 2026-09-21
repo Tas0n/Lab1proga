@@ -109,3 +109,46 @@ filterForm.addEventListener("submit", (event) => {
 });
 
 loadIncidents();
+
+const summaryBtn = document.querySelector("#summary-btn");
+const summaryStatusElement = document.querySelector("#summary-status");
+const summaryContainer = document.querySelector("#summary-container");
+
+async function loadSeveritySummary() {
+  summaryStatusElement.textContent = "Завантаження…";
+  summaryContainer.replaceChildren();
+
+  try {
+    const summaryList = await apiFetch("/api/incidents/severity-summary");
+    summaryStatusElement.textContent = "Оновлено";
+
+    if (summaryList.length === 0) {
+      summaryContainer.textContent = "Дані відсутні.";
+      return;
+    }
+
+    const list = document.createElement("ul");
+    list.className = "incident-list";
+
+    for (const item of summaryList) {
+      const li = document.createElement("li");
+      li.style.padding = "0.5rem 0";
+      
+      // Використання createTextElement (всередині textContent) гарантує захист від XSS
+      li.append(
+        createTextElement("strong", `${item.severity}: `),
+        document.createTextNode(item.count)
+      );
+      
+      list.append(li);
+    }
+
+    summaryContainer.replaceChildren(list);
+  } catch (error) {
+    summaryStatusElement.textContent = `Помилка: ${error.message}`;
+  }
+}
+
+if (summaryBtn) {
+  summaryBtn.addEventListener("click", loadSeveritySummary);
+}
