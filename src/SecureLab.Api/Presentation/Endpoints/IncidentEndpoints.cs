@@ -64,7 +64,7 @@ public static class IncidentEndpoints
                 statusCode: StatusCodes.Status404NotFound)
             : Results.Ok(incident);
     }
-}
+
 
 private static async Task<IResult> GetSeveritySummaryAsync(
         IncidentQueries queries,
