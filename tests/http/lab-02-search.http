@@ -1,0 +1,5 @@
+@baseUrl = http://localhost:5080
+### Звичайний пошук
+GET {{baseUrl}}/api/incidents/search?q=навчальн
+### Легітимний апостроф
+GET {{baseUrl}}/api/incidents/search?q=O%27Brien
