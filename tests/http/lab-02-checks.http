@@ -83,3 +83,51 @@ Content-Type: application/json
 
 ### Перевірка власника створеного запису
 GET {{api}}/api/incidents/<a4fd7cbf-522b-4cdb-9ead-7b18c04c0422>
+
+### A. Звичайний пошук
+GET {{api}}/api/incidents/search?q=USB
+
+### B. Значення, якого немає
+GET {{api}}/api/incidents/search?q=zz-no-match
+
+### C. Контрольний ввід S-01: zz-no-match' OR TRUE -- (з пробілом наприкінці)
+GET {{api}}/api/incidents/search?q=zz-no-match%27%20OR%20TRUE%20--%20
+
+### D. Легітимний апостроф
+GET {{api}}/api/incidents/search?q=O%27Brien
+
+### A — USB
+GET {{api}}/api/incidents/search?q=USB
+
+### B — немає збігу
+GET {{api}}/api/incidents/search?q=zz-no-match
+
+### C — S-02: той самий контрольний ввід
+GET {{api}}/api/incidents/search?q=zz-no-match%27%20OR%20TRUE%20--%20
+
+### D — апостроф (T-04)
+GET {{api}}/api/incidents/search?q=O%27Brien
+
+### Апостроф у кирилиці
+GET {{api}}/api/incidents/search?q=%D0%BA%D0%BE%D0%BC%D0%BF%27%D1%8E%D1%82%D0%B5%D1%80%D0%BD%D0%BE%D0%B3%D0%BE
+
+### % як буквальний символ
+GET {{api}}/api/incidents/search?q=%25
+
+### _ як буквальний символ
+GET {{api}}/api/incidents/search?q=_
+
+### Зворотна скісна риска
+GET {{api}}/api/incidents/search?q=%5C
+
+### sortBy
+GET {{api}}/api/incidents/search
+
+### sortBy=severity
+GET {{api}}/api/incidents/search?sortBy=severity
+
+### sortBy=status
+GET {{api}}/api/incidents/search?sortBy=status
+
+### T-05 — невідоме сортування
+GET {{api}}/api/incidents/search?sortBy=price
