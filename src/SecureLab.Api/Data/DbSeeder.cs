@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using SecureLab.Api.Data.Entities;
 
@@ -5,6 +6,10 @@ namespace SecureLab.Api.Data;
 
 public static class DbSeeder
 {
+    public const string ReporterRole = "Reporter";
+    public const string AnalystRole = "Analyst";
+    public const string AdministratorRole = "Administrator";
+
     public static readonly Guid AliceId = Guid.Parse("10000000-0000-0000-0000-000000000001");
     public static readonly Guid BobId = Guid.Parse("10000000-0000-0000-0000-000000000002");
     public static readonly Guid MorganId = Guid.Parse("10000000-0000-0000-0000-000000000003");
@@ -12,46 +17,47 @@ public static class DbSeeder
 
     public static readonly Guid AliceIncidentId = Guid.Parse("20000000-0000-0000-0000-000000000001");
     public static readonly Guid BobIncidentId = Guid.Parse("20000000-0000-0000-0000-000000000002");
+    public static readonly Guid SafeTextIncidentId = Guid.Parse("20000000-0000-0000-0000-000000000003");
 
-    public static async Task SeedAsync(SecureLabDbContext dbContext)
+    private static readonly Guid ReporterRoleId =
+        Guid.Parse("50000000-0000-0000-0000-000000000001");
+    private static readonly Guid AnalystRoleId =
+        Guid.Parse("50000000-0000-0000-0000-000000000002");
+    private static readonly Guid AdministratorRoleId =
+        Guid.Parse("50000000-0000-0000-0000-000000000003");
+
+    public static async Task SeedAsync(
+        SecureLabDbContext dbContext,
+        UserManager<ApplicationUser> userManager,
+        RoleManager<IdentityRole<Guid>> roleManager,
+        IConfiguration configuration)
     {
-        if (await dbContext.Users.AnyAsync())
+        await EnsureRoleAsync(roleManager, ReporterRoleId, ReporterRole);
+        await EnsureRoleAsync(roleManager, AnalystRoleId, AnalystRole);
+        await EnsureRoleAsync(roleManager, AdministratorRoleId, AdministratorRole);
+
+        var password = configuration["SeedUsers:Password"];
+        var userCount = await dbContext.Users.CountAsync(user =>
+            user.Id == AliceId || user.Id == BobId || user.Id == MorganId || user.Id == AdminId);
+        if ((userCount < 4 || await dbContext.Users.AnyAsync(user => user.PasswordHash == null)) && string.IsNullOrWhiteSpace(password))
+        {
+            throw new InvalidOperationException(
+                "SeedUsers:Password має бути передано поза Git для створення локальних навчальних акаунтів.");
+        }
+
+        var alice = await EnsureUserAsync(
+            userManager, AliceId, "alice", "alice@example.test", "Аліса Коваль", ReporterRole, password);
+        var bob = await EnsureUserAsync(
+            userManager, BobId, "bob", "bob@example.test", "Боб Мельник", ReporterRole, password);
+        var morgan = await EnsureUserAsync(
+            userManager, MorganId, "morgan", "morgan@example.test", "Морган Литвин", AnalystRole, password);
+        _ = await EnsureUserAsync(
+            userManager, AdminId, "admin", "admin@example.test", "Локальний адміністратор", AdministratorRole, password);
+
+        if (await dbContext.Incidents.AnyAsync())
         {
             return;
         }
-
-        var alice = new StudyUser
-        {
-            Id = AliceId,
-            UserName = "alice",
-            DisplayName = "Аліса Коваль",
-            Email = "alice@example.test",
-            Role = "Reporter"
-        };
-        var bob = new StudyUser
-        {
-            Id = BobId,
-            UserName = "bob",
-            DisplayName = "Боб Мельник",
-            Email = "bob@example.test",
-            Role = "Reporter"
-        };
-        var morgan = new StudyUser
-        {
-            Id = MorganId,
-            UserName = "morgan",
-            DisplayName = "Морган Литвин",
-            Email = "morgan@example.test",
-            Role = "Analyst"
-        };
-        var admin = new StudyUser
-        {
-            Id = AdminId,
-            UserName = "admin",
-            DisplayName = "Локальний адміністратор",
-            Email = "admin@example.test",
-            Role = "Administrator"
-        };
 
         var aliceIncident = new Incident
         {
@@ -90,7 +96,6 @@ public static class DbSeeder
             UpdatedAtUtc = new DateTimeOffset(2026, 8, 3, 8, 0, 0, TimeSpan.Zero)
         };
 
-        dbContext.Users.AddRange(alice, bob, morgan, admin);
         dbContext.Incidents.AddRange(aliceIncident, bobIncident, safeTextIncident);
         dbContext.IncidentComments.AddRange(
             new IncidentComment
@@ -124,5 +129,73 @@ public static class DbSeeder
             });
 
         await dbContext.SaveChangesAsync();
+    }
+
+    private static async Task EnsureRoleAsync(
+        RoleManager<IdentityRole<Guid>> roleManager,
+        Guid id,
+        string name)
+    {
+        if (await roleManager.RoleExistsAsync(name))
+        {
+            return;
+        }
+
+        var result = await roleManager.CreateAsync(new IdentityRole<Guid>
+        {
+            Id = id,
+            Name = name
+        });
+        EnsureSucceeded(result, $"create role {name}");
+    }
+
+    private static async Task<ApplicationUser> EnsureUserAsync(
+        UserManager<ApplicationUser> userManager,
+        Guid id,
+        string userName,
+        string email,
+        string displayName,
+        string role,
+        string? password)
+    {
+        var existing = await userManager.FindByIdAsync(id.ToString());
+        if (existing is not null)
+        {
+            if (!await userManager.HasPasswordAsync(existing))
+            {
+                EnsureSucceeded(await userManager.AddPasswordAsync(existing,
+                    password ?? throw new InvalidOperationException("Seed password is missing.")), "set study password");
+                await userManager.UpdateSecurityStampAsync(existing);
+            }
+            if (!await userManager.IsInRoleAsync(existing, role))
+                EnsureSucceeded(await userManager.AddToRoleAsync(existing, role), "assign study role");
+            return existing;
+        }
+
+        var user = new ApplicationUser
+        {
+            Id = id,
+            UserName = userName,
+            Email = email,
+            DisplayName = displayName,
+            EmailConfirmed = true
+        };
+        var createResult = await userManager.CreateAsync(
+            user,
+            password ?? throw new InvalidOperationException("Seed password is missing."));
+        EnsureSucceeded(createResult, $"create user {userName}");
+        EnsureSucceeded(await userManager.AddToRoleAsync(user, role), $"assign role {role}");
+        return user;
+    }
+
+    private static void EnsureSucceeded(IdentityResult result, string operation)
+    {
+        if (result.Succeeded)
+        {
+            return;
+        }
+
+        var codes = string.Join(", ", result.Errors.Select(error => error.Code));
+        throw new InvalidOperationException($"Identity seed operation '{operation}' failed: {codes}.");
     }
 }

@@ -9,5 +9,5 @@ public sealed class IncidentComment
     public bool IsInternal { get; set; }
     public DateTimeOffset CreatedAtUtc { get; set; }
     public Incident Incident { get; set; } = null!;
-    public StudyUser Author { get; set; } = null!;
+    public ApplicationUser Author { get; set; } = null!;
 }

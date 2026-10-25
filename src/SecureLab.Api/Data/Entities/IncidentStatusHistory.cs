@@ -10,5 +10,5 @@ public sealed class IncidentStatusHistory
     public required string Note { get; set; }
     public DateTimeOffset CreatedAtUtc { get; set; }
     public Incident Incident { get; set; } = null!;
-    public StudyUser ChangedByUser { get; set; } = null!;
+    public ApplicationUser ChangedByUser { get; set; } = null!;
 }

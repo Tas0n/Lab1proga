@@ -11,7 +11,7 @@ public sealed class Incident
     public DateTimeOffset OccurredAtUtc { get; set; }
     public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset UpdatedAtUtc { get; set; }
-    public StudyUser Owner { get; set; } = null!;
+    public ApplicationUser Owner { get; set; } = null!;
     public List<IncidentComment> Comments { get; set; } = [];
     public List<IncidentStatusHistory> StatusHistory { get; set; } = [];
 }

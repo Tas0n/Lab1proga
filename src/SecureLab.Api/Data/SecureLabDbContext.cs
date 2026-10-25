@@ -1,28 +1,32 @@
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using SecureLab.Api.Data.Entities;
 
 namespace SecureLab.Api.Data;
 
 public sealed class SecureLabDbContext(DbContextOptions<SecureLabDbContext> options)
-    : DbContext(options)
+    : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>(options)
 {
-    public DbSet<StudyUser> Users => Set<StudyUser>();
     public DbSet<Incident> Incidents => Set<Incident>();
     public DbSet<IncidentComment> IncidentComments => Set<IncidentComment>();
     public DbSet<IncidentStatusHistory> IncidentStatusHistory => Set<IncidentStatusHistory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        var user = modelBuilder.Entity<StudyUser>();
-        user.ToTable("study_users");
-        user.HasKey(item => item.Id);
-        user.Property(item => item.Id).HasColumnName("id");
-        user.Property(item => item.UserName).HasColumnName("user_name").HasMaxLength(64);
-        user.Property(item => item.DisplayName).HasColumnName("display_name").HasMaxLength(120);
-        user.Property(item => item.Email).HasColumnName("email").HasMaxLength(254);
-        user.Property(item => item.Role).HasColumnName("role").HasMaxLength(32);
-        user.HasIndex(item => item.UserName).IsUnique();
-        user.HasIndex(item => item.Email).IsUnique();
+        base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<ApplicationUser>(user =>
+        {
+            user.ToTable("identity_users");
+            user.Property(item => item.DisplayName).HasMaxLength(120);
+        });
+        modelBuilder.Entity<IdentityRole<Guid>>().ToTable("identity_roles");
+        modelBuilder.Entity<IdentityUserRole<Guid>>().ToTable("identity_user_roles");
+        modelBuilder.Entity<IdentityUserClaim<Guid>>().ToTable("identity_user_claims");
+        modelBuilder.Entity<IdentityUserLogin<Guid>>().ToTable("identity_user_logins");
+        modelBuilder.Entity<IdentityRoleClaim<Guid>>().ToTable("identity_role_claims");
+        modelBuilder.Entity<IdentityUserToken<Guid>>().ToTable("identity_user_tokens");
 
         var incident = modelBuilder.Entity<Incident>();
         incident.ToTable("incidents");
