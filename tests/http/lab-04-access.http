@@ -1,0 +1,80 @@
+@host = http://localhost:5080
+@aliceId = 20000000-0000-0000-0000-000000000001
+@bobId = 20000000-0000-0000-0000-000000000002
+@aliceNewId = 20000000-0000-0000-0000-000000000003
+@bobNewId = 20000000-0000-0000-0000-000000000004
+@unknownId = 20000000-0000-0000-0000-0000000000ff
+@commentToBob = 30000000-0000-0000-0000-000000000002
+@internalComment = 30000000-0000-0000-0000-000000000003
+
+### Anonymous details (A-01): очікувано 401 після виправлення
+GET {{host}}/api/incidents/{{aliceId}}
+Accept: application/json
+
+### Alice login; REST Client reads process environment
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "userName": "alice", "password": "{{$processEnv SeedUsers__Password}}" }
+
+### Own details (A-02)
+GET {{host}}/api/incidents/{{aliceId}}
+Accept: application/json
+
+### Foreign details with the same Alice cookie (A-03)
+GET {{host}}/api/incidents/{{bobId}}
+Accept: application/json
+
+### Unknown id with the same Alice cookie (A-10)
+GET {{host}}/api/incidents/{{unknownId}}
+Accept: application/json
+
+### List as Alice (A-05)
+GET {{host}}/api/incidents
+Accept: application/json
+
+### Foreign update with the same Alice cookie (A-04)
+PUT {{host}}/api/incidents/{{bobId}}
+Content-Type: application/json
+
+{ "title": "Змінено Alice (PoC)", "description": "IDOR update PoC", "occurredAtUtc": "2026-08-02T10:00:00+00:00" }
+
+### Foreign delete with the same Alice cookie (A-04)
+DELETE {{host}}/api/incidents/{{bobNewId}}
+
+### Reporter triage — vertical escalation (A-06)
+POST {{host}}/api/incidents/{{aliceNewId}}/triage
+
+### Child: comment on Bob incident by direct id (A-12)
+GET {{host}}/api/incident-comments/{{commentToBob}}
+Accept: application/json
+
+### Child: internal comment for Reporter (A-12)
+GET {{host}}/api/incident-comments/{{internalComment}}
+Accept: application/json
+
+### Bob login changes current identity
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "userName": "bob", "password": "{{$processEnv SeedUsers__Password}}" }
+
+### Bob own details — state after Alice update
+GET {{host}}/api/incidents/{{bobId}}
+Accept: application/json
+
+### Morgan login; Analyst read
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "userName": "morgan", "password": "{{$processEnv SeedUsers__Password}}" }
+
+### Permitted Analyst read (A-03R)
+GET {{host}}/api/incidents/{{aliceId}}
+Accept: application/json
+
+### Analyst content update — матриця: 403
+PUT {{host}}/api/incidents/{{aliceId}}
+Content-Type: application/json
+
+{ "title": "Analyst edit", "description": "x", "occurredAtUtc": null }
