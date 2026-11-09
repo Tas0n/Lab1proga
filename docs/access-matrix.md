@@ -13,3 +13,27 @@
 | Зміна severity/status (status лише через `POST /api/incidents/{id}/triage`, New → Triaged) | добрий | deny, 401 | deny, 403 для будь-якого Reporter (включно з owner); роль перевіряється до пошуку ресурсу; audit. Через update severity/status змінити не можна | status: allow лише New → Triaged; status ≠ New — deny, 409; неіснуючий id — 404. Зміни severity немає: deny, 403 | deny, 403 (права не опубліковано); audit | Ні: owner не надає права на зміну severity/status | role gate + handler; next status визначає сервер; A-06, A-07, A-08a, A-09 |
 | Перегляд child `GET /api/incident-comments/{id}` та internal comment у details | добрий | deny, 401 | публічний коментар до власного інциденту — allow; internal — deny, 404; коментар до чужого інциденту — deny, 404 | allow, включно з internal, після перевірки доступу до parent incident | deny, 404 (прав не опубліковано) | Ні для internal-правила; доступ до parent перевіряється окремо | та сама видимість у details-проєкції й у child endpoint; A-12 |
 
+## Політика відмов (403 / 404 / 409)
+Для чужого головного ресурсу authenticated non-owner одержує **404 Not Found**.
+**Обґрунтування.** Факт існування чужого інциденту безпеки сам є чутливою
+інформацією. Тому API не розрізняє «ресурсу не існує» і «ресурс не доступний
+цьому користувачу». Відповідь для чужого й неіснуючого id однакова за status,
+Content-Type і тілом; відрізняється лише поле кореляції `traceId`. Тіло: Problem
+Details з title «Інцидент не знайдено», без id у полі detail. Обидві гілки
+чужий і неіснуючий використовують один helper `IncidentNotFound()`.
+**Виняток для triage.** Роль перевіряється до пошуку ресурсу, тому будь-який
+Reporter одержує 403 незалежно від того, чи існує id. Відповідь не залежить від
+існування ресурсу, отже нічого про нього не розкриває.
+**Область застосування.** Політика однакова для details, update, delete і child
+endpoint (`GET /api/incident-comments/{id}`). 
+**Порядок перевірок на сервері:** автентифікація (401) → роль для привілейованої
+дії (403) → пошук ресурсу з урахуванням видимості (404) → право на дію (403) →
+допустимість стану (409) → зміна стану й відповідь.
+### Очікувані відповіді за endpoint-ами
+| Endpoint | Анонім | Власник (Reporter) | Чужий Reporter | Неіснуючий id | Analyst | Administrator |
+|---|---|---|---|---|---|---|
+| `GET /api/incidents/{id}` | 401 | 200 | 404 | 404 | 200 | чужий 404 |
+| `PUT /api/incidents/{id}` | 401 | 204 | 404 | 404 | 403 | чужий 404 |
+| `DELETE /api/incidents/{id}` | 401 | 204 (лише New), інакше 409 | 404 | 404 | 403 | чужий 404 |
+| `POST /api/incidents/{id}/triage` | 401 | 403 | 403 | 403 (Reporter) / 404 (Analyst) | 204 (New), інакше 409 | 403 |
+| `GET /api/incident-comments/{id}` | 401 | 200 (публічний), internal 404 | 404 | 404 | 200 | 404 |
