@@ -179,6 +179,10 @@ def scenario_triage():
     morgan = Client("morgan")
     morgan.call("POST", f"/api/incidents/{INC['alice']}/triage",
                 label="Morgan -> triage already Triaged incident (очікувано 409)")
+    morgan.call("GET", f"/api/incidents/{INC['alice_new2']}", label="BEFORE: Morgan reads incident-5")
+    morgan.call("POST", f"/api/incidents/{INC['alice_new2']}/triage",
+                label="Morgan(Analyst) -> triage New incident-5 (A-07)")
+    morgan.call("GET", f"/api/incidents/{INC['alice_new2']}", label="AFTER: Morgan reads incident-5")
 
 
 def scenario_child():
@@ -191,10 +195,26 @@ def scenario_child():
                           label="Morgan -> internal comment")
 
 
+def scenario_same404():
+    header("SAME 404: чужий і неіснуючий id однакові (A-10)")
+    alice = Client("alice")
+    s1, b1, c1 = alice.call("GET", f"/api/incidents/{INC['bob']}", label="Alice -> Bob (чужий)")
+    s2, b2, c2 = alice.call("GET", f"/api/incidents/{INC['unknown']}", label="Alice -> unknown (неіснуючий)")
+    def strip(body):
+        if isinstance(body, dict):
+            return {k: v for k, v in body.items() if k not in ("traceId", "requestId")}
+        return body
+    print(f"    status однаковий: {s1 == s2} ({s1} / {s2})")
+    print(f"    Content-Type однаковий: {c1 == c2} ({c1})")
+    print(f"    тіло без traceId однакове: {strip(b1) == strip(b2)}")
+    print("    тіло без traceId: " + json.dumps(strip(b1), ensure_ascii=False))
+
+
 SCENARIOS = {
     "read": scenario_read, "list": scenario_list, "update": scenario_update,
     "overpost": scenario_overpost, "child": scenario_child,
     "triage": scenario_triage, "delete": scenario_delete,
+    "same404": scenario_same404,
 }
 
 if __name__ == "__main__":

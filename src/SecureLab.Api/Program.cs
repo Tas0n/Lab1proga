@@ -1,7 +1,8 @@
+using Microsoft.AspNetCore.Authorization;
+using SecureLab.Api.Application.Incidents;
 using SecureLab.Api.Scaffolding;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
-using SecureLab.Api.Application.Incidents;
 using SecureLab.Api.Data;
 using SecureLab.Api.Presentation.Endpoints;
 
@@ -20,7 +21,10 @@ var connectionString = builder.Configuration.GetConnectionString("SecureLab")
 builder.Services.AddDbContext<SecureLabDbContext>(options =>
     options.UseNpgsql(connectionString));
 builder.Services.AddScoped<IncidentQueries>();
-
+builder.Services.AddSingleton<IAuthorizationHandler, IncidentAuthorizationHandler>();
+builder.Services.Configure<AuthorizationOptions>(options =>
+    options.AddPolicy(IncidentPolicies.Triage,
+        policy => policy.RequireRole(DbSeeder.AnalystRole)));
 builder.AddLab03Identity();
 
 var app = builder.Build();

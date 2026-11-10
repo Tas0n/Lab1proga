@@ -89,3 +89,9 @@ Build/tests output; hash тегу v0.4.0 (= fixed commit; вписується �
 |---|---|---|---|
 | | | | |
 Паролі, cookie, реальні персональні дані й приватний репозиторій не надсилайте.
+
+## Git
+- Гілка: lab/4-authorization
+- Vulnerable commit: 508b489860e8826cdedb4ab8730d2c2eec79b9fc
+- Fixed commit: (буде додано наступним commit)
+- Тег: v0.4.0 (на fixed commit)

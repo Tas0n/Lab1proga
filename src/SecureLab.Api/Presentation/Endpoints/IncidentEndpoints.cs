@@ -8,7 +8,9 @@ public static class IncidentEndpoints
 {
     public static IEndpointRouteBuilder MapIncidentEndpoints(this IEndpointRouteBuilder endpoints)
     {
+        // ЛР 4: уся група вимагає автентифікації — анонім отримує 401 (A-01).
         var group = endpoints.MapGroup("/api/incidents")
+            .RequireAuthorization()
             .WithTags("Incidents");
 
         group.MapGet("/", GetListAsync)
@@ -21,7 +23,7 @@ public static class IncidentEndpoints
             .Produces<IncidentDetailsResponse>()
             .ProducesProblem(StatusCodes.Status404NotFound);
 
-       group.MapGet("/severity-summary", GetSeveritySummaryAsync)
+        group.MapGet("/severity-summary", GetSeveritySummaryAsync)
             .WithName("GetIncidentSeveritySummary")
             .Produces<IReadOnlyList<IncidentSeveritySummaryResponse>>(StatusCodes.Status200OK);
 
@@ -30,6 +32,7 @@ public static class IncidentEndpoints
 
     private static async Task<IResult> GetListAsync(
         string? status,
+        HttpContext httpContext,
         IncidentQueries queries,
         CancellationToken cancellationToken)
     {
@@ -48,25 +51,38 @@ public static class IncidentEndpoints
             parsedStatus = candidate;
         }
 
-        return Results.Ok(await queries.GetListAsync(parsedStatus, cancellationToken));
+        // Ідентифікатор і роль — лише з перевіреного principal.
+        if (!CurrentUser.TryGetId(httpContext.User, out var userId))
+        {
+            return Results.Challenge();
+        }
+
+        return Results.Ok(await queries.GetListAsync(
+            parsedStatus,
+            userId,
+            CurrentUser.IsAnalyst(httpContext.User),
+            cancellationToken));
     }
 
     private static async Task<IResult> GetDetailsAsync(
         Guid id,
+        HttpContext httpContext,
         IncidentQueries queries,
         CancellationToken cancellationToken)
     {
-        var incident = await queries.GetDetailsAsync(id, cancellationToken);
-        return incident is null
-            ? Results.Problem(
-                title: "Інцидент не знайдено",
-                detail: $"Інцидент '{id}' не існує.",
-                statusCode: StatusCodes.Status404NotFound)
-            : Results.Ok(incident);
+        if (!CurrentUser.TryGetId(httpContext.User, out var userId))
+        {
+            return Results.Challenge();
+        }
+
+        var incident = await queries.GetDetailsAsync(
+            id, userId, CurrentUser.IsAnalyst(httpContext.User), cancellationToken);
+
+        // Чужий і неіснуючий id — той самий helper, без detail з id (політика 404).
+        return incident is null ? IncidentResults.NotFound() : Results.Ok(incident);
     }
 
-
-private static async Task<IResult> GetSeveritySummaryAsync(
+    private static async Task<IResult> GetSeveritySummaryAsync(
         IncidentQueries queries,
         CancellationToken cancellationToken)
     {

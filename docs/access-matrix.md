@@ -37,3 +37,35 @@ endpoint (`GET /api/incident-comments/{id}`).
 | `DELETE /api/incidents/{id}` | 401 | 204 (лише New), інакше 409 | 404 | 404 | 403 | чужий 404 |
 | `POST /api/incidents/{id}/triage` | 401 | 403 | 403 | 403 (Reporter) / 404 (Analyst) | 204 (New), інакше 409 | 403 |
 | `GET /api/incident-comments/{id}` | 401 | 200 (публічний), internal 404 | 404 | 404 | 200 | 404 |
+
+## Privileged action: triage (New → Triaged)
+**Маршрут:** `POST /api/incidents/{id}/triage`. Body не приймається: next status визначає сервер.
+**Хто має право.** Лише роль `Analyst`: policy `IncidentTriage` = `RequireRole(Analyst)`.
+Рішення ухвалюється імперативно в endpoint через `IAuthorizationService`, щоб записати
+audit event при відмові.
+**Додатковий context.**Поточний status береться з БД (tracked entity). Перехід дозволено лише зі status `New`;
+інакше 409 Conflict.Next status (`Triaged`) задає сервер; клієнт не передає ні status, ні role, ні owner.
+Ownership для Analyst не потрібен: Analyst бачить усі інциденти.Tenant у SecureLab відсутній.
+**Чи може owner виконати transition?** Ні. Reporter не може тріажувати навіть власний
+інцидент: оцінку severity і triage робить незалежний Analyst, а не автор звернення.
+**Порядок перевірок:** автентифікація (401) → роль Analyst (403; до пошуку ресурсу,
+тому відповідь не розкриває існування id) → пошук ресурсу (404) → status = New (409) →
+сервер встановлює Triaged → SaveChangesAsync.
+
+| Суб'єкт | Ресурс | Очікуваний результат |
+|---|---|---|
+| anonymous | будь-який | 401 |
+| Reporter — власник (Alice → свій New) | incident-3 | 403, status лишається New, audit event |
+| Reporter — не власник (Bob → New інцидент Alice) | incident-3 | 403 (не 404: роль перевіряється до пошуку), audit event |
+| Reporter → неіснуючий id | unknown | 403 — так само, існування не розкривається |
+| Analyst → New | incident-5 | 204, status → Triaged |
+| Analyst → не New | incident-1 (Triaged) | 409 |
+| Analyst → неіснуючий id | unknown | 404 |
+| Administrator (власний чи чужий) | будь-який | 403: для Incident додаткових прав не має |
+**Ігнорування підміни.** Поля `role`, `status`, `ownerUserId`, `isTransitionAllowed` у body
+не читаються й не впливають на рішення.
+**Audit event після deny** (logger `SecureLab.Audit`, рівень Warning):
+`authorization.denied` з полями `subject` (id користувача з principal), `action`
+(`incident.triage`), `resource` (id з маршруту), `result` (`denied`), `occurredAtUtc` (UTC)
+і `traceId` (той самий, що в Problem Details відповіді).
+Не логуються: password, cookie, token, тіло запиту, stack trace.
