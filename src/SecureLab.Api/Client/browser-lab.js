@@ -7,11 +7,11 @@ async function load() {
   if (!response.ok) return;
   current = await response.json();
   document.querySelector("#title").textContent = current.title;
-  document.querySelector("#description").innerHTML = current.description;
+    document.querySelector("#description").textContent = current.description;
   document.querySelector("#comments").replaceChildren();
   for (const comment of current.comments ?? []) {
     const paragraph = document.createElement("p");
-    paragraph.innerHTML = comment.text;
+      paragraph.textContent = comment.text;
     document.querySelector("#comments").append(paragraph);
   }
   document.querySelector("#edit").elements.description.value = current.description;
