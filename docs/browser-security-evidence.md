@@ -18,12 +18,12 @@ Flow є stored XSS: значення збережене в PostgreSQL і вик�
 
 | Спостереження | До fix | Після fix | Посилання на доказ |
 |---|---|---|---|
-| Значення в БД/API | | | |
-| DOM основного Description | | | |
-| Дія marker | | | |
-| Апостроф/лапки, 5 < 7, Unicode, HTML-like рядок | | | |
-| Довжина за власними правилами ЛР 2 | | | |
-| Вікно Morgan: GET і перевірка marker; контроль Bob | | | |
+| Значення в БД/API | `description` = marker, довжина 113 | той самий рядок, довжина 113 | Console fetch до/після |
+| DOM основного Description | елемент `<img src="x" onerror="…">` у `#description` | один текстовий вузол, `<img>` немає ||
+| Дія marker | `data-lab05-marker="executed"`, перевірка → 'executed'; є запит `x` | перевірка → null; запиту `x` немає |  |
+| Апостроф/лапки, 5 < 7, Unicode, HTML-like рядок | перші три коректні; `<b>` став елементом | усі чотири показані як текст без змін |  |
+| Довжина за власними правилами ЛР 2 | 3900 символів, коректно (межа 4000) | 3900 символів, коректно | тест 5 |
+| Вікно Morgan: GET і перевірка marker; контроль Bob | Morgan: GET 200, 'executed'; Bob: GET ‹404›, null | Morgan: GET 200, null; Bob: без змін |  |
 
 Finding: актив; передумови; першопричина; safe DOM diff; retest; залишковий ризик: … Повторювана REG-XSS-01, негативний контроль і очікування: …
 
@@ -59,22 +59,30 @@ Finding: актив; передумови; першопричина; safe DOM di
 
 | Сценарій | Чи доходить request до API? | Чи може JavaScript прочитати response? | Чому |
 |---|---|---|---|
-| same-origin 5080 → API | | | |
-| simple GET 4173 → API | | | |
-| simple GET 4174 → API | | | |
-| curl/.http → API | | не застосовується | |
-| preflighted 4173 → API («Добре / Відмінно») | | | |
+| same-origin 5080 → API | так | так | той самий origin, CORS не потрібен; діють лише authentication/authorization API |
+| simple GET 4173 → API | так | ні без валідної CORS-відповіді; так після policy, що дозволяє 4173 | браузер застосовує SOP/CORS: потрібен Access-Control-Allow-Origin: http://localhost:4173 |
+| simple GET 4174 → API | так | ні (4174 не буде в allowlist) | SOP/CORS: заголовка дозволу для 4174 немає |
+| curl/.http → API | так | не застосовується | curl не є браузером і не застосовує SOP/CORS |
+| preflighted 4173 → API («Добре / Відмінно») | — | — | на рівні «Задовільно» не виконується |
+
+Перевірка порядку: fetch('/api/incidents') з 4173 без cookie → 401, прочитано JavaScript, без CORS-помилки».
 
 Команди запуску probes: … Policy — лише Development, один exact origin 4173; 4174 — контроль. Для «Задовільно» без AllowCredentials().
 
 | Клієнт / простий запит | До policy | Fixed state | Status, ACAO, Console / доказ |
 |---|---|---|---|
-| Same-origin 5080 | | | |
-| Allowed 4173 | | | |
-| Disallowed 4174 | | | |
-| Direct HTTP / curl | | | |
+| Same-origin 5080 | GET /api/incidents/{id} → 200 (етап 1–2) | без змін | CORS не потрібен; діє authorization ЛР4 |
+| Allowed 4173 | Failed to fetch, немає ACAO | {status: 200, body: '{"status":"ready"}'} | ACAO: http://localhost:4173;  |
+| Disallowed 4174 | Failed to fetch, немає ACAO | Failed to fetch, немає ACAO; запит надіслано з Origin: http://localhost:4174 |  |
+| Direct HTTP / curl | 200 | 200 | curl не застосовує SOP/CORS |
 
 REG-CORS-01: browser evidence і дві actual HTTP-відповіді для Origin 4173/4174: … Перевірка порядку через читання 401 без cross-origin cookie: … Пояснення різниці browser/direct HTTP: …
+
+Кінцевий стан CORS: policy `Lab05BrowserProbe` у `src/SecureLab.Api/Program.cs` реєструється (`AddCors`) і застосовується (`UseCors`, після `UseRouting`, до `UseAuthentication`) лише в Development. Allowlist — один точний origin `http://localhost:4173`, метод GET, без `AllowCredentials()` (рівень «Задовільно»). `http://localhost:4174` — негативний контроль, не дозволений. Це навчальний стенд: штатний клієнт працює same-origin на `http://localhost:5080` і від CORS не залежить. У Production policy не реєструється.
+
+Команди запуску probes:
+py -3 -m http.server 4173 --bind localhost --directory demonstrations/cors-probe
+py -3 -m http.server 4174 --bind localhost --directory demonstrations/cors-probe
 
 ## Механізм сеансу
 <div id="description">Звичайний опис без розмітки</div>
