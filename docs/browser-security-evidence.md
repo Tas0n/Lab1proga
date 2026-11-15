@@ -1,6 +1,14 @@
 # Докази безпеки браузера (DEL-01)
 
 Рівень: достатній («Задовільно») 
+## Підсумок
+
+| Finding | До | Першопричина | Fix | Retest | Залишковий ризик |
+|---|---|---|---|---|---|
+| F-05-01 Stored/DOM-based XSS у Description (і коментарях) | marker виконався в сесіях alice і morgan (`data-lab05-marker="executed"`), `<img>` у DOM | `browser-lab.js`, `load()`: `innerHTML = current.description` (ряд. 10) і `innerHTML = comment.text` (ряд. 14) | `textContent` в обох місцях; дані не змінюються | той самий marker → текстовий вузол, `null`; значення 113 = 113; позитивні рядки коректні | майбутній код може знову вжити `innerHTML`; CSP не налаштована (поза рівнем); інші клієнти поза інвентаризацією |
+| CORS для навчальних origins | 4173 і 4174 не могли читати відповідь | policy відсутня (очікувано для same-origin застосунку) | `Lab05BrowserProbe`: лише `http://localhost:4173`, GET, лише Development | 4173 → 200 + ACAO; 4174 → CORS error; curl → 200 для обох | CORS не захищає від прямих клієнтів і CSRF; захист даних тримається на authentication/authorization ЛР4 |
+
+Стан Git: vulnerable `<VULNERABLE_HASH>` → XSS fix `<XSS_FIX_HASH>` → CORS `<CORS_HASH>` → фінальні докази, тег `v0.5.0`.
 
 ## Стенд і Git-стан (Для всіх)
 
@@ -84,11 +92,40 @@ REG-CORS-01: browser evidence і дві actual HTTP-відповіді для Or
 py -3 -m http.server 4173 --bind localhost --directory demonstrations/cors-probe
 py -3 -m http.server 4174 --bind localhost --directory demonstrations/cors-probe
 
+### REG-CORS-01: точний allowlist CORS
+
+**Частина 1. Browser evidence.**
+1. Термінал 1: `dotnet run --project src/SecureLab.Api` (Development, `http://localhost:5080`).
+2. Термінал 2: `py -3 -m http.server 4173 --bind localhost --directory demonstrations/cors-probe` (macOS/Linux: `python3 -m http.server …`).
+3. Термінал 3: `py -3 -m http.server 4174 --bind localhost --directory demonstrations/cors-probe`.
+4. На `http://localhost:4173/` і `http://localhost:4174/` у DevTools Console виконати:
+   `await fetch("http://localhost:5080/health").then(async (response) => ({ status: response.status, body: await response.text() }))`
+5. Очікування: 4173 → `{status: 200, body: '{"status":"ready"}'}`, у Network відповідь має `Access-Control-Allow-Origin: http://localhost:4173`. 4174 → `TypeError: Failed to fetch` і `No 'Access-Control-Allow-Origin' header…`; у Network є запит до `http://localhost:5080/health` з `Origin: http://localhost:4174`, без ACAO. Якщо запиту до 5080 немає, це помилка топології стенда, а не доказ CORS.
+6. Перевірка порядку: на 4173 `await fetch("http://localhost:5080/api/incidents").then(r => r.status)` → `401` без CORS-помилки.
+
+**Частина 2. HTTP evidence**:
+
+curl -sS -D - -o /dev/null -H "Origin: http://localhost:4173" "http://localhost:5080/health"
+curl -sS -D - -o /dev/null -H "Origin: http://localhost:4174" "http://localhost:5080/health"
+
+Очікування: обидві відповіді `HTTP/1.1 200 OK`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`; перша містить `Access-Control-Allow-Origin: http://localhost:4173`; друга не містить жодного `Access-Control-*`. Статус 200 для 4174 не є помилкою policy: сервер виконав запит, а читання заборонив би лише браузер. Фактичні відповіді: `docs/evidence/cors-allowed-4173.txt`, `docs/evidence/cors-disallowed-4174.txt`.
+
 ## Механізм сеансу
 <div id="description">Звичайний опис без розмітки</div>
 .AspNetCore.Identity.Application	localhost	/	Session	891	✓		Lax			Mediu
 
+### REG-XSS-01: stored XSS в Incident.Description
 
+| Поле | Вміст |
+|---|---|
+| Передумови | Fixed state: commit з тегом `v0.5.0` (гілка `lab/5-browser-xss`). Негативний контроль: vulnerable commit `<VULNERABLE_HASH>`. ОС Windows, Git Bash, Chrome. PostgreSQL з `docker compose --env-file infra/.env.example -f infra/compose.yaml up -d --wait`. У терміналі задано `SeedUsers__Password` (значення не записується). Reset: `dotnet run --project src/SecureLab.Api -- --reset-database`. Запуск: `dotnet run --project src/SecureLab.Api`. Origin клієнта: `http://localhost:5080`. Акаунти: alice (автор), morgan (Analyst, глядач), bob (контроль) |
+| Вхід | Канонічний marker з однорядкового `resources/lab05-marker.txt` (113 символів), копіювання без переносу: `tr -d '\r\n' < resources/lab05-marker.txt \| clip`. Без секретів і зовнішніх hosts |
+| Кроки | 1) Chrome, `http://localhost:5080/auth-lab.html`, вхід alice → `Login: 204`. 2) `http://localhost:5080/browser-lab.html`, DevTools (Network: Preserve log, Disable cache), Ctrl+Shift+R. 3) Console: `document.querySelector("#lab05-marker-target").getAttribute("data-lab05-marker")` → `null`. 4) Назва `ЛР5 marker`, очистити поле опису, вставити marker, «Створити й прочитати» (`POST /api/incidents` → 201, `GET /api/incidents/{id}` → 200). 6) Elements → `<div id="description">`. 7) Console: `const r = await (await fetch("/api/incidents/<GUID>")).json(); console.log(r.description.length)`. 8) Вікно інкогніто: вхід morgan, `/browser-lab.html`, Ctrl+Shift+R, вставити Guid, «Прочитати», команда з п. 3. 9) Те саме вікно: вхід bob, F5, «Прочитати» той самий Guid. 10) Позитивні рядки: створити описи `Користувач O'Brien написав "терміново"`, `5 < 7 і 9 > 3`, `Київ — Ω`, `<b>жирний</b> текст`, `"А".repeat(3900)`; прочитати seed `20000000-0000-0000-0000-000000000003` |
+| Очікуваний результат (fixed) | п. 5 і 8 → `null`; у `#description` один текстовий вузол із видимим текстом marker'а, елемента `<img>` немає; у Network немає запиту `x`; п. 7 → `113` (значення збережене без змін); bob → `GET: <404>`, `null`; усі позитивні рядки показані буквально як текст, Unicode не пошкоджено, у Console немає помилок |
+| Негативний контроль | На vulnerable commit `<VULNERABLE_HASH>` той самий marker: у `#description` елемент `<img src="x" onerror="…">`, запит `x` у Network, команда п. 3 → `'executed'` у сесіях alice і morgan; `<b>жирний</b>` ставав елементом `<b>`; seed …0003 показував лише «Текст» |
+| Доказ | (Network/Elements/Console до і після); файли: `src/SecureLab.Api/Client/browser-lab.js` (`load()`, рядки 10 і 14), diff `git diff <VULNERABLE_HASH> v0.5.0 -- src/SecureLab.Api/Client/browser-lab.js` |
+
+Виправлено sink, а не дані: `description` у response JSON до fix і після fix однаковий (113 символів, той самий рядок); змінилося лише відображення в DOM (`innerHTML` → `textContent`).
 
 ## Додатково для Добре та Відмінно
 
