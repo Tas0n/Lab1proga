@@ -18,14 +18,24 @@ async function load() {
 }
 document.querySelector("#load").addEventListener("click", load);
 document.querySelector("#edit").addEventListener("submit", async event => {
-  event.preventDefault();
-  const response = await fetch("/api/incidents", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title: event.currentTarget.elements.title.value, description: event.currentTarget.elements.description.value,
-      severity: "Low", occurredAtUtc: new Date().toISOString() }) });
-  status.textContent = `POST: ${response.status}`;
-  if (response.ok) {
-    const created = await response.json();
-    document.querySelector("#incident-id").value = created.id;
-    await load();
-  }
+    event.preventDefault();
+    const form = event.currentTarget;
+    try {
+        // ЛР 6: створення змінює стан, тому йде через helper з antiforgery header.
+        const response = await SecureLabCsrf.mutate("/api/incidents", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                title: form.elements.title.value, description: form.elements.description.value,
+                severity: "Low", occurredAtUtc: new Date().toISOString()
+            })
+        });
+        status.textContent = `POST: ${response.status}`;
+        if (response.ok) {
+            const created = await response.json();
+            document.querySelector("#incident-id").value = created.id;
+            await load();
+        }
+    } catch (error) {
+        status.textContent = `POST: ${error.message}`;
+    }
 });

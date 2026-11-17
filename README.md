@@ -16,7 +16,7 @@ Starter навмисно не містить завершених рішень �
 
 ## 1. Передумови
 
-- .NET SDK `10.0.302` (зафіксовано у `global.json`);
+- стабільний .NET SDK `10.0.*` (`global.json`: `10.0.100`, `rollForward: latestFeature`);
 - Docker із підтримкою `docker compose`;
 - Git;
 - вільні локальні порти `5080` і `54329`.
@@ -136,3 +136,14 @@ docs/                    карта архітектури, варіант, ма
 
 Перед commit перегляньте `git status`, `git diff --staged` і переконайтеся, що
 до Git не потрапили `.env`, cookies, tokens, реальні passwords, dumps або logs.
+
+## 8. Стан після ЛР 6 
+
+- Змінювальні запити з cookie входу (`POST /api/incidents`, `PUT`/`DELETE /api/incidents/{id}`, `POST /api/incidents/{id}/triage`, `POST /api/auth/logout`) вимагають antiforgery request token у заголовку `X-CSRF-TOKEN`. Токен видає `GET /api/antiforgery/token` після входу; браузерний клієнт робить це автоматично через `Client/csrf.js`.
+- Тести потребують пароля seed у змінній середовища (значення не записувати в Git):
+  ```bash
+  read -rs SeedUsers__Password && export SeedUsers__Password
+  dotnet run --project src/SecureLab.Api -- --reset-database
+  dotnet test SecureLab.sln -c Release
+  ```
+- Звіт безпеки: `docs/security-review.md`, модель загроз: `docs/threat-model.md`, знахідки: `docs/findings/`.

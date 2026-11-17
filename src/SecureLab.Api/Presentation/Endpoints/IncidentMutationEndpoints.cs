@@ -1,3 +1,4 @@
+using SecureLab.Api.Security;
 using System.Diagnostics;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
@@ -46,9 +47,9 @@ public static class IncidentMutationEndpoints
         this IEndpointRouteBuilder app)
     {
         var incidents = app.MapGroup("/api/incidents").RequireAuthorization();
-        incidents.MapPut("/{id:guid}", UpdateAsync);
-        incidents.MapDelete("/{id:guid}", DeleteAsync);
-        incidents.MapPost("/{id:guid}/triage", TriageAsync);
+        incidents.MapPut("/{id:guid}", UpdateAsync).AddEndpointFilter<AntiforgeryFilter>();
+        incidents.MapDelete("/{id:guid}", DeleteAsync).AddEndpointFilter<AntiforgeryFilter>();
+        incidents.MapPost("/{id:guid}/triage", TriageAsync).AddEndpointFilter<AntiforgeryFilter>();
 
         app.MapGet("/api/incident-comments/{id:guid}", GetCommentAsync)
             .RequireAuthorization();

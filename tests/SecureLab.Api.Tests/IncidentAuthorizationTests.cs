@@ -31,7 +31,12 @@ public sealed class IncidentAuthorizationTests(SecureLabApiFactory factory)
         Environment.GetEnvironmentVariable("SeedUsers__Password")
         ?? throw new InvalidOperationException("Set local SeedUsers__Password outside Git.");
 
-    private Task<HttpClient> LoginAsync(string userName) => factory.LoginAsync(userName, Password);
+    private async Task<HttpClient> LoginAsync(string userName)
+    {
+        var client = await factory.LoginAsync(userName, Password);
+        await client.UseAntiforgeryTokenAsync();
+        return client;
+    }
 
     // ---------- A-01: анонім ----------
 
