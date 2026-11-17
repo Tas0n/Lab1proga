@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using SecureLab.Api.Data;
 using SecureLab.Api.Presentation.Endpoints;
+using Microsoft.AspNetCore.Antiforgery;
 
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
@@ -26,6 +27,11 @@ builder.Services.Configure<AuthorizationOptions>(options =>
     options.AddPolicy(IncidentPolicies.Triage,
         policy => policy.RequireRole(DbSeeder.AnalystRole)));
 builder.AddLab03Identity();
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-CSRF-TOKEN";
+    options.Cookie.Name = "securelab-af";
+});
 
 if (builder.Environment.IsDevelopment())
 {
@@ -96,6 +102,11 @@ app.MapGet("/health", async (SecureLabDbContext dbContext, CancellationToken can
 app.MapIncidentEndpoints();
 app.MapIncidentMutationEndpoints();
 app.MapLab03Identity();
+app.MapGet("/api/antiforgery/token", (IAntiforgery antiforgery, HttpContext httpContext) =>
+{
+    var tokens = antiforgery.GetAndStoreTokens(httpContext);
+    return Results.Ok(new { token = tokens.RequestToken });
+}).RequireAuthorization();
 app.MapLab02Endpoints();
 app.MapFallbackToFile("index.html");
 

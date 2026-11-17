@@ -70,6 +70,7 @@ public sealed class AuthenticationSecurityTests(SecureLabApiFactory factory)
     public async Task A05_CreateWithForgedOwner_KeepsOwnerFromPrincipal()
     {
         using var bob = await factory.LoginAsync("bob", StudyPassword);
+        await bob.UseAntiforgeryTokenAsync();
         var title = "A05 forged owner " + Guid.NewGuid().ToString("N")[..8];
 
         using var response = await bob.PostAsJsonAsync("/api/incidents", new
